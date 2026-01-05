@@ -22,17 +22,8 @@ jobs:
 
       - name:  Build with Maven
         run: mvn clean package -DskipTests
-<build>:
-    <plugins>
-    <plugin>
-      <groupId>org.sonarsource.scanner.maven</groupId>
-      <artifactId>sonar-maven-plugin</artifactId>
-      <version>3.9.1.2184</version> <!-- Use the latest version -->
-    </plugin>
-  </plugins>
-</build>
 
-- name:  Find WAR file
+      - name:  Find WAR file
         run: echo "WAR_FILE=$(ls target/*.war | head -n 1)" >> $GITHUB_ENV
 
       - name:  Upload WAR artifact
@@ -176,17 +167,3 @@ jobs:
 
 
 
-
-
-            
-
-
-
-
-            
-
-            
-
-
-
-            
