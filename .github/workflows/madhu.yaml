@@ -47,7 +47,8 @@ jobs:
             -Dsonar.projectKey=train-ticket-reservation \
             -Dsonar.host.url=$SONAR_HOST_URL \
             -Dsonar.login=$SONAR_TOKEN \
-            -DaltDeploymentRepository=nexus::default::${{ secrets.NEXUS_REPO_URL }}
+            -DaltDeploymentRepository=nexus::${{ secrets.NEXUS_REPO_URL }}
+
 
       - name: Locate WAR file
         run: |
