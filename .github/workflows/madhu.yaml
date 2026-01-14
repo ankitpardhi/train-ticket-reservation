@@ -8,19 +8,36 @@ on:
 
 jobs:
   build:
-    name: Build, Scan & Publish
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout source code
+      - name:  Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Java 17
+      - name:  Set up Java
         uses: actions/setup-java@v4
         with:
-          distribution: temurin
+          distribution: 'temurin'
           java-version: '17'
-          cache: maven
+
+      - name:  Build with Maven
+        run: mvn clean package -DskipTests
+
+      - name:  Find WAR file
+        run: echo "WAR_FILE=$(ls target/*.war | head -n 1)" >> $GITHUB_ENV
+
+      - name:  Upload WAR artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: war-file
+          path: ${{ env.WAR_FILE }}
+
+      - name: SonarQube Analysis
+        run: |
+         mvn sonar:sonar \
+         -Dsonar.projectKey=train-ticket-reservation \
+         -Dsonar.host.url=${{ secrets.SONAR_HOST_URL }} \
+         -Dsonar.login=${{ secrets.SONAR_TOKEN }}
 
       - name: Configure Maven settings.xml for Nexus
         run: |
@@ -37,53 +54,33 @@ jobs:
           </settings>
           EOF
 
-      - name: Build, SonarQube Scan & Deploy to Nexus
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
-        run: |
-          mvn --batch-mode clean verify deploy \
-            -DskipTests \
-            -Dsonar.projectKey=train-ticket-reservation \
-            -Dsonar.host.url=$SONAR_HOST_URL \
-            -Dsonar.login=$SONAR_TOKEN \
-            -DaltDeploymentRepository=nexus::${{ secrets.NEXUS_REPO_URL }}
+      - name: Upload Artifact to Nexus
+        run: mvn deploy -DaltDeploymentRepository=nexus::default::${{ secrets.NEXUS_REPO_URL }}
 
-
-      - name: Locate WAR file
-        run: |
-          WAR_FILE=$(ls target/*.war | head -n 1)
-          echo "WAR_FILE=$WAR_FILE" >> $GITHUB_ENV
-
-      - name: Upload WAR artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: train-ticket-reservation-war
-          path: ${{ env.WAR_FILE }}
+     
+      
 
   deploy-dev:
-    name: Deploy to DEV (Tomcat)
     needs: build
     runs-on: ubuntu-latest
 
     steps:
-      - name: Download WAR artifact
-        uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v4
         with:
-          name: train-ticket-reservation-war
+          name: war-file
 
-      - name: Deploy WAR to Tomcat DEV
+      - name:  Deploy to DEV
         env:
-          TOMCAT_URL: ${{ secrets.TOMCAT_URL_DEV }}
-          TOMCAT_USER: ${{ secrets.TOMCAT_USER_DEV }}
-          TOMCAT_PASS: ${{ secrets.TOMCAT_PASS_DEV }}
+          URL: ${{ secrets.TOMCAT_URL_DEV }}
+          USER: ${{ secrets.TOMCAT_USER_DEV }}
+          PASS: ${{ secrets.TOMCAT_PASS_DEV }}
         run: |
           WAR_FILE=$(ls *.war | head -n 1)
-          APP_NAME=$(basename "$WAR_FILE" .war)
+          echo "Deploying $WAR_FILE to DEV ($URL)"
 
-          echo "Deploying $WAR_FILE to DEV as context /$APP_NAME"
+          echo "Checking Tomcat Manager access..."
+          curl -v -u "$USER:$PASS" "$URL/list"
 
-          curl --fail --show-error \
-            -u "$TOMCAT_USER:$TOMCAT_PASS" \
-            -T "$WAR_FILE" \
-            "$TOMCAT_URL/deploy?path=/$APP_NAME&update=true"
+          echo "Deploying WAR file..."
+          curl -v -u "$USER:$PASS" --fail --show-error -T "$WAR_FILE" \
+            "$URL/deploy?path=/train-ticket-reservation&update=true" 
