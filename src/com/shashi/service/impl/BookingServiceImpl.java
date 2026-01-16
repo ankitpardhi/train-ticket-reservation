@@ -73,6 +73,7 @@ public class BookingServiceImpl implements BookingService {
 				throw new TrainException(ResponseCode.INTERNAL_SERVER_ERROR);
 			}
 			ps.close();
+			System.out.println("intellij");
 		} catch (SQLException e) {
 			System.out.println(e.getMessage());
 			throw new TrainException(e.getMessage());
